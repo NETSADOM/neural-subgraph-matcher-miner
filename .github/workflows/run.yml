@@ -60,12 +60,17 @@ jobs:
             -v "${{ github.workspace }}:/app" \
             -e PYTHONUNBUFFERED=1 \
             decoder-image:latest \
-            bash -c "
+            bash -c '
               set -e -x
 
-              cd /app
+              cd /app || { echo "ERROR: cannot cd /app"; exit 1; }
 
-              echo 'Running beam search decoder ...'
+              echo "Current dir:"; pwd
+              ls -la metta.pkl 2>/dev/null || echo "→ metta.pkl not found in /app"
+
+              echo "────────────────────────────────────────"
+              echo "Running beam search decoder ..."
+
               python -m subgraph_mining.decoder \
                 --dataset=metta.pkl \
                 --search_strategy=beam \
@@ -74,35 +79,41 @@ jobs:
                 --node_anchored \
                 --out_path=/app/results/patterns-beam.pkl
 
-              echo '──────────────────────────────────────'
-              echo 'Sanity checking output file ...'
+              echo "────────────────────────────────────────"
+              echo "Sanity checking output file ..."
 
-              python -c '
-import os, pickle, sys
+              python <<'EOF'
+import os
+import pickle
+import sys
 
-path = \"/app/results/patterns-beam.pkl\"
+path = "/app/results/patterns-beam.pkl"
 
 if not os.path.exists(path):
-    print(f\"ERROR: File not found → {path}\")
-    print(\"ls -la /app/results:\")
-    os.system(\"ls -la /app/results\")
+    print(f"ERROR: File not found → {path}")
+    print("Directory content:")
+    os.system("ls -la /app/results")
     sys.exit(1)
 
-with open(path, \"rb\") as f:
-    patterns = pickle.load(f)
+try:
+    with open(path, "rb") as f:
+        patterns = pickle.load(f)
+except Exception as e:
+    print(f"ERROR: Cannot load pickle file: {e}")
+    sys.exit(1)
 
 if not patterns:
-    print(\"ERROR: patterns list is empty\")
+    print("ERROR: patterns list is empty")
     sys.exit(2)
 
-print(f\"OK: Beam search produced {len(patterns)} patterns\")
-              '
+print(f"OK: Beam search produced {len(patterns)} patterns")
+EOF
 
-              echo '──────────────────────────────────────'
-              echo 'Final directory listing:'
+              echo "────────────────────────────────────────"
+              echo "Final directory listing:"
               ls -la /app/results || true
               ls -la /app/plots   || true
-            "
+            '
 
       - name: Show generated files (host side)
         run: |
