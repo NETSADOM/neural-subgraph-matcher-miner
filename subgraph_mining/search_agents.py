@@ -874,7 +874,10 @@ class BeamSearchAgent(SearchAgent):
         if not self.pattern_beams[self.current_size]:
             # Sample seed nodes and create initial patterns
             initial_beam = []
-            num_seeds = min(self.beam_width * 2, self.n_trials - self.trials_completed)
+            # For beam search we do not use n_trials as a hard stopping
+            # criterion. Simply generate a small fixed multiple of the
+            # beam width as initial seeds.
+            num_seeds = self.beam_width * 2
             
             for _ in range(num_seeds):
                 graph_idx, seed_node = self._sample_seed_node()
@@ -925,7 +928,6 @@ class BeamSearchAgent(SearchAgent):
             # Sort and keep top beam_width patterns
             self.pattern_beams[self.current_size] = sorted(
                 initial_beam, key=lambda x: x[0])[:self.beam_width]
-            self.trials_completed += len(initial_beam)
         
         # Grow patterns
         current_beam = self.pattern_beams[self.current_size]
