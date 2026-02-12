@@ -2,14 +2,15 @@ name: Run Decoder
 
 on:
   push:
-    branches: [main , test/visualizer-refactor]
+    branches: [main, test/visualizer-refactor]
   pull_request:
-    branches: [main , test/visualizer-refactor]
+    branches: [main, test/visualizer-refactor]
   workflow_dispatch:
 
 jobs:
   run-decoder:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -24,35 +25,39 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
+
       - name: Build Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           load: true
           tags: decoder-image:latest
-          cache-from: |
-            type=local,src=/tmp/.buildx-cache
-          cache-to: |
-            type=local,dest=/tmp/.buildx-cache-new,mode=max
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
       - name: Move cache
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
       - name: Create output directories
         run: |
           mkdir -p ${{ github.workspace }}/plots/cluster
           mkdir -p ${{ github.workspace }}/results
           chmod -R 777 ${{ github.workspace }}/plots
           chmod -R 777 ${{ github.workspace }}/results
+
       - name: Check available processors and usage percentage
         id: cpu-check
         run: |
           TOTAL_CPUS=$(nproc)
           USED_CPUS=4
           PERCENT_USED=$(( 100 * USED_CPUS / TOTAL_CPUS ))
+
           echo "Total available processors: $TOTAL_CPUS"
           echo "Processors used for decoder: $USED_CPUS"
           echo "Percent of processors used: ${PERCENT_USED}%"
+
           echo "total_cpus=$TOTAL_CPUS" >> $GITHUB_OUTPUT
           echo "percent_used=$PERCENT_USED" >> $GITHUB_OUTPUT
 
@@ -65,6 +70,7 @@ jobs:
             bash -c "
               set -e
               cd /app
+
               echo 'Starting decoder run with beam search...'
               python -m subgraph_mining.decoder \
                 --dataset=metta.pkl \
@@ -75,91 +81,43 @@ jobs:
                 --out_path=/app/results/patterns-beam.pkl
 
               echo 'Sanity checking beam output...'
-              python - << 'EOF'
-              import os, pickle, sys
 
-              path = '/app/results/patterns-beam.pkl'
-              if not os.path.exists(path):
-                print(f'ERROR: {path} not found')
-                sys.exit(1)
+              python -c \"
+import os, pickle, sys
 
-              with open(path, 'rb') as f:
-                patterns = pickle.load(f)
+path = '/app/results/patterns-beam.pkl'
+if not os.path.exists(path):
+    print(f'ERROR: {path} not found')
+    sys.exit(1)
 
-              if not patterns:
-                print('ERROR: Beam search produced no patterns')
-                sys.exit(1)
+with open(path, 'rb') as f:
+    patterns = pickle.load(f)
 
-                print(f'OK: Beam search produced {len(patterns)} patterns')
+if not patterns:
+    print('ERROR: Beam search produced no patterns')
+    sys.exit(1)
 
-              print(f'OK: Beam search produced {len(patterns)} patterns')
-             "EOF"
+print(f'OK: Beam search produced {len(patterns)} patterns')
+\"
 
               echo 'Checking output directories...'
               ls -la /app/plots/cluster || true
               ls -la /app/results || true
             "
-      # - name: Run pattern counter in Docker container
-      #   run: |
-      #     docker run --rm \
-      #       -v ${{ github.workspace }}:/app \
-      #       -e PYTHONUNBUFFERED=1 \
-      #       decoder-image:latest \
-      #       bash -c "
-      #         set -e
-      #         export PYTHONPATH=/app
-      #         echo 'Running pattern counter...'
-      #         python -m analyze.count_patterns \
-      #           --dataset=metta.pkl \
-      #           --queries_path=results/patterns.pkl \
-      #           --out_path=results/ \
-      #           --node_anchored \
-
-      #         echo 'Counting completed.'
-      #         ls -la /app/results
-      #       "
-      # - name: Run matcher in Docker container
-      #  run: |
-      #   docker run --rm \
-      #    -v ${{ github.workspace }}:/app \
-      #   -e PYTHONUNBUFFERED=1 \
-      #  decoder-image:latest \
-      # bash -c "
-      #  set -e
-      # echo 'Starting matcher run on custom gene graph...'
-      #ython -m subgraph_matching.train \
-      # --dataset=graph \
-      #--graph_pkl_path=graph.pkl \
-      #--node_anchored \
-      #--batch_size 16 \
-      #--val_size 128
-      #echo 'Checking output directories...'
-      #ls -la /app/results
-      # ls -la /app/plots
-      #"
-      #         echo 'Starting matcher run on custom gene graph...'
-      #         python -m subgraph_matching.train \
-      #           --dataset=graph \
-      #           --graph_pkl_path=graph.pkl \
-      #           --node_anchored \
-      #           --batch_size 16 \
-      #           --val_size 128
-      #         echo 'Checking output directories...'
-      #         ls -la /app/results
-      #         ls -la /app/plots
-      #       "
 
       - name: Check for generated files
         run: |
           echo "Checking plots directory:"
           ls -R plots/ || echo "No plots directory found"
+
           echo "Checking results directory:"
           ls -R results/ || echo "No results directory found"
-      - name: Upload plots as artifact
+
+      - name: Upload plots and results as artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: decoder-plots
+          name: decoder-output
           path: |
             plots/
             results/
