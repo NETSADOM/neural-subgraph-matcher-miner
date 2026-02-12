@@ -1,4 +1,5 @@
 name: Run Decoder
+
 on:
   push:
     branches: [main , test/visualizer-refactor]
@@ -64,19 +65,20 @@ jobs:
             bash -c "
               set -e
               cd /app
-              echo 'Starting decoder run...'
+              echo 'Starting decoder run with beam search...'
               python -m subgraph_mining.decoder \
-                --dataset=CA-GrQc.pkl \
+                --dataset=metta.pkl \
                 --search_strategy=beam \
                 --beam_width=5 \
                 --n_trials=200 \
-                --out_path=results/patterns.pkl
+                --node_anchored \
+                --out_path=/app/results/patterns-beam.pkl
 
               echo 'Sanity checking beam output...'
-python - << 'EOF'
+              python - << 'EOF'
 import os, pickle, sys
 
-path = 'results/patterns.pkl'
+path = '/app/results/patterns-beam.pkl'
 if not os.path.exists(path):
     print(f'ERROR: {path} not found')
     sys.exit(1)
@@ -92,8 +94,8 @@ print(f'OK: Beam search produced {len(patterns)} patterns')
 EOF
 
               echo 'Checking output directories...'
-              ls -la /app/plots/cluster 
-              ls -la /app/results 
+              ls -la /app/plots/cluster || true
+              ls -la /app/results || true
             "
       # - name: Run pattern counter in Docker container
       #   run: |
