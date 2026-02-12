@@ -76,21 +76,23 @@ jobs:
 
               echo 'Sanity checking beam output...'
               python - << 'EOF'
-import os, pickle, sys
+              import os, pickle, sys
 
-path = '/app/results/patterns-beam.pkl'
-if not os.path.exists(path):
-    print(f'ERROR: {path} not found')
-    sys.exit(1)
+              path = '/app/results/patterns-beam.pkl'
+              if not os.path.exists(path):
+                print(f'ERROR: {path} not found')
+                sys.exit(1)
 
-with open(path, 'rb') as f:
-    patterns = pickle.load(f)
+              with open(path, 'rb') as f:
+                patterns = pickle.load(f)
 
-if not patterns:
-    print('ERROR: Beam search produced no patterns')
-    sys.exit(1)
+              if not patterns:
+                print('ERROR: Beam search produced no patterns')
+                sys.exit(1)
 
-print(f'OK: Beam search produced {len(patterns)} patterns')
+                print(f'OK: Beam search produced {len(patterns)} patterns')
+
+              print(f'OK: Beam search produced {len(patterns)} patterns')
 EOF
 
               echo 'Checking output directories...'
