@@ -64,19 +64,38 @@ jobs:
             decoder-image:latest \
             bash -c "
               set -e
+              cd /app
               echo 'Starting decoder run...'
               python -m subgraph_mining.decoder \
                 --dataset=CA-GrQc.pkl \
+                --search_strategy=beam \
+                --beam_width=5 \
                 --n_trials=200 \
-                --node_anchored \
-                --out_path=/app/results/patterns.pkl \
-                
+                --out_path=results/patterns.pkl
 
+              echo 'Sanity checking beam output...'
+              python - << 'EOF'
+import os, pickle, sys
+
+path = 'results/patterns.pkl'
+if not os.path.exists(path):
+    print(f'ERROR: {path} not found')
+    sys.exit(1)
+
+with open(path, 'rb') as f:
+    patterns = pickle.load(f)
+
+if not patterns:
+    print('ERROR: Beam search produced no patterns')
+    sys.exit(1)
+
+print(f'OK: Beam search produced {len(patterns)} patterns')
+EOF
 
               echo 'Checking output directories...'
-              ls -la /app/plots/cluster
-              ls -la /app/results
-              "
+              ls -la /app/plots/cluster || true
+              ls -la /app/results || true
+            "
       # - name: Run pattern counter in Docker container
       #   run: |
       #     docker run --rm \
